@@ -1,0 +1,5 @@
+{
+  "name": "AI Image Studio",
+  "description": "An AI-powered application to generate and edit images using Google's Gemini models. Create new visuals from text prompts or modify existing pictures with simple instructions.",
+  "requestFramePermissions": []
+}
