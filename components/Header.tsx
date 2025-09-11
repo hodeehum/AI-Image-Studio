@@ -8,7 +8,7 @@ const Header: React.FC = () => {
         AI Image Studio
       </h1>
       <p className="mt-2 text-slate-400">
-        Generate & Edit Images with Nano Banana ✨
+        Generate &amp; Edit Images with the Gemini API ✨
       </p>
     </header>
   );

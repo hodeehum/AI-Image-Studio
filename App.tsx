@@ -9,6 +9,17 @@ import ImageEditor from './components/ImageEditor';
 const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.Generate);
 
+  const renderContent = () => {
+    switch (mode) {
+      case AppMode.Generate:
+        return <ImageGenerator />;
+      case AppMode.Edit:
+        return <ImageEditor />;
+      default:
+        return <ImageGenerator />;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 font-sans">
       <Header />
@@ -16,7 +27,7 @@ const App: React.FC = () => {
         <div className="max-w-4xl mx-auto">
           <Tabs activeTab={mode} setActiveTab={setMode} />
           <div className="mt-8">
-            {mode === AppMode.Generate ? <ImageGenerator /> : <ImageEditor />}
+            {renderContent()}
           </div>
         </div>
       </main>

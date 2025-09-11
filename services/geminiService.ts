@@ -1,48 +1,49 @@
-import { GoogleGenAI, Modality } from "@google/genai";
-
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-/**
- * Generates an image from a text prompt using the imagen model.
- * @param prompt The text prompt to generate the image from.
- * @returns A data URL string of the generated PNG image.
- */
-export const generateImage = async (prompt: string): Promise<string> => {
-    try {
-        const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: prompt,
-            config: {
-              numberOfImages: 1,
-              outputMimeType: 'image/png',
-              aspectRatio: '1:1',
-            },
-        });
-
-        const generatedImage = response.generatedImages?.[0];
-        if (!generatedImage || !generatedImage.image || !generatedImage.image.imageBytes) {
-            throw new Error("Image generation failed or returned no data.");
-        }
-
-        const base64ImageBytes = generatedImage.image.imageBytes;
-        return `data:image/png;base64,${base64ImageBytes}`;
-    } catch (error) {
-        console.error("Error generating image:", error);
-        throw new Error("Failed to generate image. Please check the prompt and API key.");
-    }
-};
-
 interface ImageData {
     base64Data: string;
     mimeType: string;
 }
 
+const API_ENDPOINT = '/api/gemini';
+
 /**
- * Edits an image based on a text prompt using the gemini-2.5-flash-image-preview model.
+ * Handles the response from the backend API proxy.
+ * @param response The fetch Response object.
+ * @returns The JSON response data.
+ * @throws An error if the response is not ok.
+ */
+const handleApiResponse = async (response: Response) => {
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ 
+            error: `Request failed with status ${response.status}` 
+        }));
+        throw new Error(errorData.error || 'An unknown error occurred.');
+    }
+    if (response.headers.get('Content-Type')?.includes('application/json')) {
+        return response.json();
+    }
+    return response;
+};
+
+/**
+ * Calls the backend proxy to generate an image from a text prompt.
+ * @param prompt The text prompt to generate the image from.
+ * @returns A data URL string of the generated PNG image.
+ */
+export const generateImage = async (prompt: string): Promise<string> => {
+    const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate', prompt }),
+    });
+    const data = await handleApiResponse(response);
+    if (!data.imageUrl) {
+        throw new Error("Backend API did not return an image URL.");
+    }
+    return data.imageUrl;
+};
+
+/**
+ * Calls the backend proxy to edit an image based on a text prompt.
  * @param prompt The text prompt describing the edit.
  * @param images An array of original images, each with base64 data and a MIME type.
  * @param aspectRatio The desired aspect ratio for the output image.
@@ -53,57 +54,14 @@ export const editImage = async (
   images: ImageData[],
   aspectRatio: '1:1' | '16:9' | '9:16'
 ): Promise<{ imageUrl: string; text: string | null }> => {
-    try {
-        const imageParts = images.map(image => ({
-            inlineData: {
-                data: image.base64Data,
-                mimeType: image.mimeType,
-            },
-        }));
-
-        let fullPrompt = prompt;
-        if (aspectRatio === '16:9') {
-            fullPrompt += '\n\nEnsure the output image has a 16:9 aspect ratio.';
-        } else if (aspectRatio === '9:16') {
-            fullPrompt += '\n\nEnsure the output image has a 9:16 aspect ratio.';
-        }
-
-        const textPart = { text: fullPrompt };
-
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image-preview',
-            contents: {
-                parts: [...imageParts, textPart],
-            },
-            config: {
-                responseModalities: [Modality.IMAGE, Modality.TEXT],
-            },
-        });
-        
-        const candidate = response.candidates?.[0];
-        if (!candidate || !candidate.content || !candidate.content.parts) {
-            throw new Error("Invalid response from API. No content parts found.");
-        }
-        
-        let imageUrl: string | null = null;
-        let text: string | null = null;
-
-        for (const part of candidate.content.parts) {
-            if (part.inlineData) {
-                const { data, mimeType: responseMimeType } = part.inlineData;
-                imageUrl = `data:${responseMimeType};base64,${data}`;
-            } else if (part.text) {
-                text = (text ? text + "\n" : "") + part.text;
-            }
-        }
-
-        if (!imageUrl) {
-            throw new Error("API did not return an image. It might have refused the request. Please try a different prompt or image.");
-        }
-
-        return { imageUrl, text };
-    } catch (error) {
-        console.error("Error editing image:", error);
-        throw new Error("Failed to edit image. The model may have safety concerns with the request.");
+    const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'edit', prompt, images, aspectRatio }),
+    });
+    const data = await handleApiResponse(response);
+     if (!data.imageUrl) {
+        throw new Error("Backend API did not return an image.");
     }
+    return data;
 };

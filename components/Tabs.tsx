@@ -28,7 +28,7 @@ const Tabs: React.FC<TabsProps> = ({ activeTab, setActiveTab }) => {
         onClick={() => setActiveTab(AppMode.Edit)}
         className={getButtonClasses(AppMode.Edit)}
       >
-        Edit (Nano Banana)
+        Edit
       </button>
     </div>
   );
