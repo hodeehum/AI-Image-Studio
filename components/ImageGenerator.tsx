@@ -4,7 +4,7 @@ import { generateImage } from '../services/geminiService';
 import Spinner from './Spinner';
 
 const ImageGenerator: React.FC = () => {
-  const [prompt, setPrompt] = useState<string>('');
+  const [prompt, setPrompt] = useState<string>('A majestic lion wearing a crown, cinematic lighting, hyperrealistic');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);

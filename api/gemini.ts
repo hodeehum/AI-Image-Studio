@@ -1,53 +1,44 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 
-// This will hold the initialized GoogleGenAI client and the API key.
 let ai: GoogleGenAI;
-// This promise ensures that the client is initialized only once during a cold start.
-let aiInitializationPromise: Promise<void> | null = null;
+const secretManager = new SecretManagerServiceClient();
 
 /**
- * Initializes the GoogleGenAI client by fetching the API key from Google Cloud Secret Manager.
- * This function is designed to run only once.
+ * Retrieves the API key from Google Cloud Secret Manager.
+ * Caches the key after the first retrieval.
  */
-const initializeAiClient = async (): Promise<void> => {
-    const secretName = process.env.API_KEY_SECRET_NAME;
-    if (!secretName) {
-        console.error("FATAL: API_KEY_SECRET_NAME environment variable is not set.");
-        throw new Error("Application is not configured with a secret name.");
+async function getApiKey(): Promise<string> {
+  const secretName = process.env.API_KEY_SECRET_NAME;
+  if (!secretName) {
+    throw new Error(
+      "The API_KEY_SECRET_NAME environment variable is not set. Please configure it in your deployment environment."
+    );
+  }
+
+  try {
+    const [version] = await secretManager.accessSecretVersion({ name: secretName });
+    const apiKey = version.payload?.data?.toString();
+    if (!apiKey) {
+      throw new Error("Could not retrieve a valid API key from Secret Manager.");
     }
-
-    try {
-        console.log(`Fetching secret: ${secretName}`);
-        const secretClient = new SecretManagerServiceClient();
-        const [version] = await secretClient.accessSecretVersion({ name: secretName });
-
-        const payload = version.payload?.data?.toString();
-        if (!payload) {
-            throw new Error("Secret payload is empty.");
-        }
-        const apiKey = payload;
-        
-        // Initialize the GoogleGenAI client with the fetched key.
-        ai = new GoogleGenAI({ apiKey });
-        console.log("Successfully initialized GoogleGenAI client from Secret Manager.");
-
-    } catch (error) {
-        console.error("Fatal: Could not initialize GoogleGenAI client from Secret Manager.", error);
-        throw new Error('Failed to initialize Gemini API client.');
-    }
-};
+    return apiKey;
+  } catch (err) {
+    console.error("Failed to access secret from Secret Manager:", err);
+    throw new Error("Failed to access API key from Secret Manager.");
+  }
+}
 
 /**
- * Ensures the AI client is ready before handling a request.
- * It uses a promise to handle concurrent requests during initialization on a cold start.
+ * Ensures the GoogleGenAI client is initialized.
+ * This function uses lazy initialization to create the client only when it's first needed.
  */
-const ensureAiClientInitialized = async (): Promise<void> => {
-    if (!aiInitializationPromise) {
-        aiInitializationPromise = initializeAiClient();
-    }
-    await aiInitializationPromise;
-};
+async function ensureAiClientInitialized() {
+  if (!ai) {
+    const apiKey = await getApiKey();
+    ai = new GoogleGenAI({ apiKey });
+  }
+}
 
 interface ImageData {
     base64Data: string;
@@ -120,11 +111,10 @@ async function handlePost(req: Request): Promise<Response> {
 
 /**
  * Main request handler for the API proxy.
- * It ensures the AI client is initialized before processing any requests.
  */
 export default async function handler(req: Request): Promise<Response> {
     try {
-        // Ensure the AI client is initialized. This will run only once on cold start.
+        // Initialize the Gemini AI client before handling any request.
         await ensureAiClientInitialized();
 
         if (req.method === 'POST') {
