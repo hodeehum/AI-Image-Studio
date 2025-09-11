@@ -9,10 +9,10 @@ const secretManager = new SecretManagerServiceClient();
  * Caches the key after the first retrieval.
  */
 async function getApiKey(): Promise<string> {
-  const secretName = process.env.API_KEY_SECRET_NAME;
+  const secretName = process.env.API_KEY_SECRET_NAME2;
   if (!secretName) {
     throw new Error(
-      "The API_KEY_SECRET_NAME environment variable is not set. Please configure it in your deployment environment."
+      "The API_KEY_SECRET_NAME2 environment variable is not set. Please configure it in your deployment environment."
     );
   }
 
