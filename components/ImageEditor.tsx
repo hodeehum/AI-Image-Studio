@@ -1,26 +1,37 @@
 import React, { useState, useCallback } from 'react';
-import { editImage } from '../services/geminiService';
 import Spinner from './Spinner';
+import { OriginalImage, EditedResult, AspectRatio } from '../types';
 
-interface OriginalImage {
-  file: File;
-  dataUrl: string;
+interface ImageEditorProps {
+  prompt: string;
+  setPrompt: (prompt: string) => void;
+  originalImages: OriginalImage[];
+  setOriginalImages: (images: OriginalImage[] | ((prev: OriginalImage[]) => OriginalImage[])) => void;
+  aspectRatio: AspectRatio;
+  setAspectRatio: (ratio: AspectRatio) => void;
+  editedResult: EditedResult | null;
+  setEditedResult: (result: EditedResult | null) => void;
+  isLoading: boolean;
+  error: string | null;
+  setError: (error: string | null) => void;
+  onEdit: () => void;
 }
 
-interface EditedResult {
-  imageUrl: string;
-  text: string | null;
-}
 
-type AspectRatio = '1:1' | '16:9' | '9:16';
-
-const ImageEditor: React.FC = () => {
-  const [prompt, setPrompt] = useState<string>('');
-  const [originalImages, setOriginalImages] = useState<OriginalImage[]>([]);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [editedResult, setEditedResult] = useState<EditedResult | null>(null);
+const ImageEditor: React.FC<ImageEditorProps> = ({
+  prompt,
+  setPrompt,
+  originalImages,
+  setOriginalImages,
+  aspectRatio,
+  setAspectRatio,
+  editedResult,
+  setEditedResult,
+  isLoading,
+  error,
+  setError,
+  onEdit,
+}) => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   const processFiles = useCallback((files: FileList) => {
@@ -53,7 +64,7 @@ const ImageEditor: React.FC = () => {
         };
         reader.readAsDataURL(file);
     });
-  }, [originalImages.length]);
+  }, [originalImages.length, setError, setEditedResult, setOriginalImages]);
 
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,44 +103,18 @@ const ImageEditor: React.FC = () => {
   const handleRemoveImage = (indexToRemove: number) => {
     setOriginalImages(prev => prev.filter((_, index) => index !== indexToRemove));
   };
-
-  const handleEdit = async () => {
-    if (originalImages.length === 0) {
-      setError('Please upload at least one image to edit.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setEditedResult(null);
-    
-    const effectivePrompt = prompt.trim() || 'Improve the quality and lighting of the image.';
-
-    try {
-      const imagesPayload = originalImages.map(img => ({
-        base64Data: img.dataUrl.split(',')[1],
-        mimeType: img.file.type,
-      }));
-      const result = await editImage(effectivePrompt, imagesPayload, aspectRatio);
-      setEditedResult(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
   
   const getAspectRatioButtonClasses = (ratio: AspectRatio) => {
     const baseClasses = "flex-1 py-2 text-sm font-medium rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:ring-sky-500 transition-colors duration-200";
     if (aspectRatio === ratio) {
       return `${baseClasses} bg-sky-600 text-white shadow`;
     }
-    return `${baseClasses} bg-slate-700 text-slate-300 hover:bg-slate-600`;
+    return `${baseClasses} bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:text-slate-500 disabled:hover:bg-slate-700 disabled:cursor-not-allowed`;
   };
 
   return (
     <div className="bg-slate-800/50 p-6 rounded-lg shadow-xl">
-      <h2 className="text-2xl font-semibold mb-4 text-slate-100">Image Editor (Nano Banana)</h2>
+      <h2 className="text-2xl font-semibold mb-4 text-slate-100">Image Editor</h2>
       <p className="mb-4 text-slate-400">
         Upload up to 8 images, choose an aspect ratio, and describe your desired edit.
       </p>
@@ -207,14 +192,14 @@ const ImageEditor: React.FC = () => {
         <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">3. Choose Aspect Ratio</label>
             <div className="flex gap-2 bg-slate-700/50 p-1 rounded-lg">
-                <button onClick={() => setAspectRatio('1:1')} className={getAspectRatioButtonClasses('1:1')}>Square (1:1)</button>
-                <button onClick={() => setAspectRatio('16:9')} className={getAspectRatioButtonClasses('16:9')}>Landscape (16:9)</button>
-                <button onClick={() => setAspectRatio('9:16')} className={getAspectRatioButtonClasses('9:16')}>Portrait (9:16)</button>
+                <button onClick={() => setAspectRatio('1:1')} className={getAspectRatioButtonClasses('1:1')} disabled={isLoading}>Square (1:1)</button>
+                <button onClick={() => setAspectRatio('16:9')} className={getAspectRatioButtonClasses('16:9')} disabled={isLoading}>Landscape (16:9)</button>
+                <button onClick={() => setAspectRatio('9:16')} className={getAspectRatioButtonClasses('9:16')} disabled={isLoading}>Portrait (9:16)</button>
             </div>
         </div>
 
         <button
-          onClick={handleEdit}
+          onClick={onEdit}
           disabled={isLoading || originalImages.length === 0}
           className="w-full flex justify-center items-center gap-2 py-3 px-4 bg-sky-600 text-white font-semibold rounded-md hover:bg-sky-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
         >

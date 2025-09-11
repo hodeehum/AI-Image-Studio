@@ -1,33 +1,23 @@
-
-import React, { useState } from 'react';
-import { generateImage } from '../services/geminiService';
+import React from 'react';
 import Spinner from './Spinner';
 
-const ImageGenerator: React.FC = () => {
-  const [prompt, setPrompt] = useState<string>('A majestic lion wearing a crown, cinematic lighting, hyperrealistic');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+interface ImageGeneratorProps {
+  prompt: string;
+  setPrompt: (prompt: string) => void;
+  imageUrl: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onGenerate: () => void;
+}
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) {
-      setError('Please enter a prompt.');
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    setImageUrl(null);
-
-    try {
-      const url = await generateImage(prompt);
-      setImageUrl(url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+const ImageGenerator: React.FC<ImageGeneratorProps> = ({
+  prompt,
+  setPrompt,
+  imageUrl,
+  isLoading,
+  error,
+  onGenerate,
+}) => {
   return (
     <div className="bg-slate-800/50 p-6 rounded-lg shadow-xl">
       <h2 className="text-2xl font-semibold mb-4 text-slate-100">Image Generation</h2>
@@ -43,7 +33,7 @@ const ImageGenerator: React.FC = () => {
           disabled={isLoading}
         />
         <button
-          onClick={handleGenerate}
+          onClick={onGenerate}
           disabled={isLoading}
           className="w-full flex justify-center items-center gap-2 py-3 px-4 bg-sky-600 text-white font-semibold rounded-md hover:bg-sky-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
         >
