@@ -1,44 +1,17 @@
 import { GoogleGenAI, Modality } from "@google/genai";
-import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 
-let ai: GoogleGenAI;
-const secretManager = new SecretManagerServiceClient();
-
-/**
- * Retrieves the API key from Google Cloud Secret Manager.
- * Caches the key after the first retrieval.
- */
-async function getApiKey(): Promise<string> {
-  const secretName = process.env.API_KEY_SECRET_NAME2;
-  if (!secretName) {
-    throw new Error(
-      "The API_KEY_SECRET_NAME2 environment variable is not set. Please configure it in your deployment environment."
-    );
-  }
-
-  try {
-    const [version] = await secretManager.accessSecretVersion({ name: secretName });
-    const apiKey = version.payload?.data?.toString();
-    if (!apiKey) {
-      throw new Error("Could not retrieve a valid API key from Secret Manager.");
-    }
-    return apiKey;
-  } catch (err) {
-    console.error("Failed to access secret from Secret Manager:", err);
-    throw new Error("Failed to access API key from Secret Manager.");
-  }
+// Get the API key directly from the environment variable injected by Cloud Run.
+const apiKey = process.env.API_KEY;
+if (!apiKey) {
+  // This error will be caught by the handler and returned as a 500 status.
+  // It's critical for debugging in a serverless environment.
+  throw new Error(
+    "The API_KEY environment variable is not set. Please configure it in your Cloud Run service using the 'Reference a secret' feature."
+  );
 }
 
-/**
- * Ensures the GoogleGenAI client is initialized.
- * This function uses lazy initialization to create the client only when it's first needed.
- */
-async function ensureAiClientInitialized() {
-  if (!ai) {
-    const apiKey = await getApiKey();
-    ai = new GoogleGenAI({ apiKey });
-  }
-}
+// Initialize the client once at the top level.
+const ai = new GoogleGenAI({ apiKey });
 
 interface ImageData {
     base64Data: string;
@@ -114,9 +87,6 @@ async function handlePost(req: Request): Promise<Response> {
  */
 export default async function handler(req: Request): Promise<Response> {
     try {
-        // Initialize the Gemini AI client before handling any request.
-        await ensureAiClientInitialized();
-
         if (req.method === 'POST') {
             return await handlePost(req);
         } else {
