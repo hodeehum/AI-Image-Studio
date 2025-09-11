@@ -13,10 +13,17 @@ const API_ENDPOINT = '/api/gemini';
  */
 const handleApiResponse = async (response: Response) => {
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
-            error: `Request failed with status ${response.status}` 
-        }));
-        throw new Error(errorData.error || 'An unknown error occurred.');
+        let errorMessage = `Request failed with status ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData && errorData.error) {
+                errorMessage = errorData.error;
+            }
+        } catch (e) {
+            // Response was not JSON or there was another parsing error.
+            // The initial errorMessage is the best we can do.
+        }
+        throw new Error(errorMessage);
     }
     if (response.headers.get('Content-Type')?.includes('application/json')) {
         return response.json();
