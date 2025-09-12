@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { AppMode, OriginalImage, EditedResult, AspectRatio } from './types';
+import { AppMode, OriginalImage, EditedResult } from './types';
 import { generateImage, editImage as apiEditImage } from './services/geminiService';
 import Header from './components/Header';
 import Tabs from './components/Tabs';
@@ -10,33 +11,54 @@ const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.Generate);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   // State for ImageGenerator
-  const [generatePrompt, setGeneratePrompt] = useState<string>('A majestic lion wearing a crown, cinematic lighting, hyperrealistic');
+  const [generatePrompt, setGeneratePrompt] = useState<string>('');
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
 
   // State for ImageEditor
   const [editPrompt, setEditPrompt] = useState<string>('');
   const [originalImages, setOriginalImages] = useState<OriginalImage[]>([]);
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
   const [editedResult, setEditedResult] = useState<EditedResult | null>(null);
 
-  const handleGenerate = async () => {
-    if (!generatePrompt.trim()) {
-      setError('Please enter a prompt.');
-      return;
+  const handleStop = () => {
+    if (abortController) {
+      abortController.abort();
+      // Immediately reset the UI state to provide instant feedback.
+      // The catch block in the API call handlers will still log the cancellation.
+      setIsLoading(false);
+      setError('Operation cancelled by user.');
+      setAbortController(null);
     }
+  };
+
+  const handleGenerate = async () => {
+    const controller = new AbortController();
+    setAbortController(controller);
+
     setIsLoading(true);
     setError(null);
     setGeneratedImageUrl(null);
 
+    const effectivePrompt = generatePrompt.trim() || 'A majestic lion wearing a crown, cinematic lighting, hyperrealistic';
+
     try {
-      const url = await generateImage(generatePrompt);
+      const url = await generateImage(effectivePrompt, controller.signal);
       setGeneratedImageUrl(url);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      if (err instanceof Error && err.name === 'AbortError') {
+        // The error message is already set by handleStop, but we log it here.
+        console.log('Generation cancelled by user.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      }
     } finally {
+      // Ensure loading state is always reset, even if handleStop hasn't been called.
       setIsLoading(false);
+      if (abortController === controller) {
+        setAbortController(null);
+      }
     }
   };
 
@@ -45,6 +67,9 @@ const App: React.FC = () => {
       setError('Please upload at least one image to edit.');
       return;
     }
+
+    const controller = new AbortController();
+    setAbortController(controller);
 
     setIsLoading(true);
     setError(null);
@@ -57,12 +82,21 @@ const App: React.FC = () => {
         base64Data: img.dataUrl.split(',')[1],
         mimeType: img.file.type,
       }));
-      const result = await apiEditImage(effectivePrompt, imagesPayload, aspectRatio);
+      const result = await apiEditImage(effectivePrompt, imagesPayload, controller.signal);
       setEditedResult(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      if (err instanceof Error && err.name === 'AbortError') {
+        // The error message is already set by handleStop, but we log it here.
+        console.log('Edit cancelled by user.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      }
     } finally {
+       // Ensure loading state is always reset, even if handleStop hasn't been called.
       setIsLoading(false);
+      if (abortController === controller) {
+        setAbortController(null);
+      }
     }
   };
 
@@ -78,6 +112,7 @@ const App: React.FC = () => {
             isLoading={isLoading}
             error={error}
             onGenerate={handleGenerate}
+            onStop={handleStop}
           />
         );
       case AppMode.Edit:
@@ -87,14 +122,13 @@ const App: React.FC = () => {
             setPrompt={setEditPrompt}
             originalImages={originalImages}
             setOriginalImages={setOriginalImages}
-            aspectRatio={aspectRatio}
-            setAspectRatio={setAspectRatio}
             editedResult={editedResult}
             setEditedResult={setEditedResult}
             isLoading={isLoading}
             error={error}
             setError={setError}
             onEdit={handleEdit}
+            onStop={handleStop}
           />
         );
       default:

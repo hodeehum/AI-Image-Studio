@@ -1,3 +1,4 @@
+
 interface ImageData {
     base64Data: string;
     mimeType: string;
@@ -34,13 +35,15 @@ const handleApiResponse = async (response: Response) => {
 /**
  * Calls the backend proxy to generate an image from a text prompt.
  * @param prompt The text prompt to generate the image from.
+ * @param signal An AbortSignal to allow for request cancellation.
  * @returns A data URL string of the generated PNG image.
  */
-export const generateImage = async (prompt: string): Promise<string> => {
+export const generateImage = async (prompt: string, signal: AbortSignal): Promise<string> => {
     const response = await fetch(API_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'generate', prompt }),
+        signal,
     });
     const data = await handleApiResponse(response);
     if (!data.imageUrl) {
@@ -53,18 +56,19 @@ export const generateImage = async (prompt: string): Promise<string> => {
  * Calls the backend proxy to edit an image based on a text prompt.
  * @param prompt The text prompt describing the edit.
  * @param images An array of original images, each with base64 data and a MIME type.
- * @param aspectRatio The desired aspect ratio for the output image.
+ * @param signal An AbortSignal to allow for request cancellation.
  * @returns An object containing the data URL of the edited image and any accompanying text.
  */
 export const editImage = async (
   prompt: string,
   images: ImageData[],
-  aspectRatio: '1:1' | '16:9' | '9:16'
+  signal: AbortSignal
 ): Promise<{ imageUrl: string; text: string | null }> => {
     const response = await fetch(API_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'edit', prompt, images, aspectRatio }),
+        body: JSON.stringify({ action: 'edit', prompt, images }),
+        signal,
     });
     const data = await handleApiResponse(response);
      if (!data.imageUrl) {
