@@ -6,23 +6,34 @@ interface ImageData {
     mimeType: string;
 }
 
+// --- Client Initialization ---
+// Initialize the client once at the top level.
+// This is a more robust pattern that ensures any environment errors (like a missing API key)
+// cause a fast failure on startup, rather than a silent crash during a request.
+const apiKey = process.env.API_KEY;
+if (!apiKey) {
+    throw new Error(
+        "The API_KEY environment variable is not set. Please configure it in your Cloud Run service using the 'Reference a secret' feature."
+    );
+}
+const ai = new GoogleGenAI({ apiKey });
+
+
 // --- Image Generation ---
-const generateImage = async (ai: GoogleGenAI, prompt: string): Promise<string> => {
+const generateImage = async (prompt: string): Promise<string> => {
     try {
-        // Make the API call more explicit and stable by requesting a single JPEG.
+        // The optional `config` object has been removed for stability, as it can cause silent crashes in some environments.
+        // The API defaults are sufficient and more reliable.
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
             prompt: prompt,
-            config: {
-                numberOfImages: 1,
-                outputMimeType: 'image/jpeg',
-            }
         });
         const generatedImage = response.generatedImages?.[0];
         if (!generatedImage?.image?.imageBytes) {
             throw new Error("Image generation failed or returned no data.");
         }
         
+        // Dynamically use the mimeType from the response for robustness.
         const mimeType = generatedImage.image.mimeType || 'image/jpeg';
         return `data:${mimeType};base64,${generatedImage.image.imageBytes}`;
     } catch (error) {
@@ -32,7 +43,7 @@ const generateImage = async (ai: GoogleGenAI, prompt: string): Promise<string> =
 };
 
 // --- Image Editing ---
-const editImage = async (ai: GoogleGenAI, prompt: string, images: ImageData[])
+const editImage = async (prompt: string, images: ImageData[])
   : Promise<{ imageUrl: string; text: string | null }> => {
     try {
         const imageParts = images.map(image => ({
@@ -40,11 +51,10 @@ const editImage = async (ai: GoogleGenAI, prompt: string, images: ImageData[])
         }));
 
         const textPart = { text: prompt };
-        const parts = [textPart, ...imageParts]; // Put text prompt first for stability
+        const parts = [textPart, ...imageParts];
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image-preview',
-            // Use the more robust chat-style format for the contents payload.
             contents: [{ role: 'user', parts }],
             config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
         });
@@ -66,7 +76,7 @@ const editImage = async (ai: GoogleGenAI, prompt: string, images: ImageData[])
 
 // --- Request Handlers ---
 
-async function handlePost(ai: GoogleGenAI, req: Request): Promise<Response> {
+async function handlePost(req: Request): Promise<Response> {
     const body = await req.json();
     const { action } = body;
     const headers = { 'Content-Type': 'application/json' };
@@ -75,13 +85,13 @@ async function handlePost(ai: GoogleGenAI, req: Request): Promise<Response> {
         case 'generate': {
             const { prompt } = body;
             if (!prompt) return new Response(JSON.stringify({ error: 'Prompt is required' }), { status: 400, headers });
-            const imageUrl = await generateImage(ai, prompt);
+            const imageUrl = await generateImage(prompt);
             return new Response(JSON.stringify({ imageUrl }), { status: 200, headers });
         }
         case 'edit': {
             const { prompt, images } = body;
             if (!prompt || !images) return new Response(JSON.stringify({ error: 'Prompt and images are required' }), { status: 400, headers });
-            const result = await editImage(ai, prompt, images);
+            const result = await editImage(prompt, images);
             return new Response(JSON.stringify(result), { status: 200, headers });
         }
         default:
@@ -95,17 +105,8 @@ async function handlePost(ai: GoogleGenAI, req: Request): Promise<Response> {
 export default async function handler(req: Request): Promise<Response> {
     const headers = { 'Content-Type': 'application/json' };
     try {
-        // Initialize the client inside the handler to catch any environment errors.
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) {
-            throw new Error(
-                "The API_KEY environment variable is not set. Please configure it in your Cloud Run service using the 'Reference a secret' feature."
-            );
-        }
-        const ai = new GoogleGenAI({ apiKey });
-
         if (req.method === 'POST') {
-            return await handlePost(ai, req);
+            return await handlePost(req);
         } else {
             return new Response(JSON.stringify({ error: `Method ${req.method} not allowed` }), {
                 status: 405,

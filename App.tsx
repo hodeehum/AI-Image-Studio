@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [mode, setMode] = useState<AppMode>(AppMode.Generate);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusText, setStatusText] = useState<string>('');
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
   // State for ImageGenerator
@@ -25,10 +26,9 @@ const App: React.FC = () => {
   const handleStop = () => {
     if (abortController) {
       abortController.abort();
-      // Immediately reset the UI state to provide instant feedback.
-      // The catch block in the API call handlers will still log the cancellation.
       setIsLoading(false);
       setError('Operation cancelled by user.');
+      setStatusText('');
       setAbortController(null);
     }
   };
@@ -37,9 +37,10 @@ const App: React.FC = () => {
     const controller = new AbortController();
     setAbortController(controller);
 
-    setIsLoading(true);
     setError(null);
     setGeneratedImageUrl(null);
+    setStatusText('The AI is generating your image...');
+    setIsLoading(true);
 
     const effectivePrompt = generatePrompt.trim() || 'A majestic lion wearing a crown, cinematic lighting, hyperrealistic';
 
@@ -48,14 +49,13 @@ const App: React.FC = () => {
       setGeneratedImageUrl(url);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        // The error message is already set by handleStop, but we log it here.
         console.log('Generation cancelled by user.');
       } else {
         setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       }
     } finally {
-      // Ensure loading state is always reset, even if handleStop hasn't been called.
       setIsLoading(false);
+      setStatusText('');
       if (abortController === controller) {
         setAbortController(null);
       }
@@ -71,9 +71,10 @@ const App: React.FC = () => {
     const controller = new AbortController();
     setAbortController(controller);
 
-    setIsLoading(true);
     setError(null);
     setEditedResult(null);
+    setStatusText('The AI is editing your masterpiece...');
+    setIsLoading(true);
 
     const effectivePrompt = editPrompt.trim() || 'Improve the quality and lighting of the image.';
 
@@ -86,14 +87,13 @@ const App: React.FC = () => {
       setEditedResult(result);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        // The error message is already set by handleStop, but we log it here.
         console.log('Edit cancelled by user.');
       } else {
         setError(err instanceof Error ? err.message : 'An unknown error occurred.');
       }
     } finally {
-       // Ensure loading state is always reset, even if handleStop hasn't been called.
       setIsLoading(false);
+      setStatusText('');
       if (abortController === controller) {
         setAbortController(null);
       }
@@ -110,6 +110,7 @@ const App: React.FC = () => {
             setPrompt={setGeneratePrompt}
             imageUrl={generatedImageUrl}
             isLoading={isLoading}
+            statusText={statusText}
             error={error}
             onGenerate={handleGenerate}
             onStop={handleStop}
@@ -125,6 +126,7 @@ const App: React.FC = () => {
             editedResult={editedResult}
             setEditedResult={setEditedResult}
             isLoading={isLoading}
+            statusText={statusText}
             error={error}
             setError={setError}
             onEdit={handleEdit}

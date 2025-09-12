@@ -1,4 +1,6 @@
+
 import React from 'react';
+import Spinner from './Spinner';
 import { convertToPngAndDownload } from '../utils/imageUtils';
 
 interface ImageGeneratorProps {
@@ -6,6 +8,7 @@ interface ImageGeneratorProps {
   setPrompt: (prompt: string) => void;
   imageUrl: string | null;
   isLoading: boolean;
+  statusText: string;
   error: string | null;
   onGenerate: () => void;
   onStop: () => void;
@@ -16,6 +19,7 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
   setPrompt,
   imageUrl,
   isLoading,
+  statusText,
   error,
   onGenerate,
   onStop,
@@ -49,7 +53,12 @@ const ImageGenerator: React.FC<ImageGeneratorProps> = ({
         {error && <div className="mt-4 p-3 bg-red-900/50 text-red-300 border border-red-700 rounded-md">{error}</div>}
 
         <div className="mt-6">
-          {imageUrl && (
+          {isLoading ? (
+            <div className="bg-slate-900 p-4 rounded-lg flex flex-col items-center justify-center text-center h-64">
+                <Spinner />
+                <p className="mt-4 text-slate-300">{statusText}</p>
+            </div>
+          ) : imageUrl && (
             <div className="bg-slate-900 p-4 rounded-lg">
               <h3 className="text-lg font-medium mb-3">Result</h3>
               <img src={imageUrl} alt="Generated" className="rounded-md w-full max-w-lg mx-auto shadow-lg" />

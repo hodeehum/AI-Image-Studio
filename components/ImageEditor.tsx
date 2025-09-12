@@ -1,4 +1,6 @@
+
 import React, { useState, useCallback } from 'react';
+import Spinner from './Spinner';
 import { OriginalImage, EditedResult } from '../types';
 import { convertToPngAndDownload } from '../utils/imageUtils';
 
@@ -10,6 +12,7 @@ interface ImageEditorProps {
   editedResult: EditedResult | null;
   setEditedResult: (result: EditedResult | null) => void;
   isLoading: boolean;
+  statusText: string;
   error: string | null;
   setError: (error: string | null) => void;
   onEdit: () => void;
@@ -25,6 +28,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
   editedResult,
   setEditedResult,
   isLoading,
+  statusText,
   error,
   setError,
   onEdit,
@@ -192,23 +196,30 @@ const ImageEditor: React.FC<ImageEditorProps> = ({
 
         {error && <div className="mt-6 p-3 bg-red-900/50 text-red-300 border border-red-700 rounded-md">{error}</div>}
 
-        {editedResult && (
-          <div className="mt-6 bg-slate-900 p-4 rounded-lg">
-            <h3 className="text-lg font-medium mb-3">Result</h3>
-            <img src={editedResult.imageUrl} alt="Edited" className="rounded-md w-full max-w-lg mx-auto shadow-lg" />
-            {editedResult.text && (
-              <div className="mt-4 p-3 bg-slate-800 rounded-md">
-                <p className="text-slate-300 whitespace-pre-wrap">{editedResult.text}</p>
-              </div>
-            )}
-            <button
-              onClick={handleDownloadEdited}
-              className="mt-4 inline-block w-full text-center py-2 px-4 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors"
-            >
-              Download Image (PNG)
-            </button>
-          </div>
-        )}
+        <div className="mt-6">
+          {isLoading ? (
+            <div className="bg-slate-900 p-4 rounded-lg flex flex-col items-center justify-center text-center h-64">
+              <Spinner />
+              <p className="mt-4 text-slate-300">{statusText}</p>
+            </div>
+          ) : editedResult && (
+            <div className="bg-slate-900 p-4 rounded-lg">
+              <h3 className="text-lg font-medium mb-3">Result</h3>
+              <img src={editedResult.imageUrl} alt="Edited" className="rounded-md w-full max-w-lg mx-auto shadow-lg" />
+              {editedResult.text && (
+                <div className="mt-4 p-3 bg-slate-800 rounded-md">
+                  <p className="text-slate-300 whitespace-pre-wrap">{editedResult.text}</p>
+                </div>
+              )}
+              <button
+                onClick={handleDownloadEdited}
+                className="mt-4 inline-block w-full text-center py-2 px-4 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                Download Image (PNG)
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Sticky Button Container */}
